@@ -157,6 +157,9 @@ final class ValidatorTests: XCTestCase {
                                                          "locale": .string("de_DE")]))
         XCTAssertTrue(rendered.hasSuffix("\nnote: {{locale}} {{hint}} }}{{"), rendered)
         XCTAssertTrue(rendered.contains("(locale de_DE, hint )"), rendered)
+        var nested = Expense.v12
+        nested.promptTemplate = "{{{text}}} | {{a {{text}} | {{}} | {{text}}{{text}}"
+        XCTAssertEqual(nested.renderPrompt(.object(["text": .string("T")])), "{T} | {{a T | {{}} | TT")
         var unterminated = Expense.v12
         unterminated.promptTemplate = "{{text}} and {{oops"
         XCTAssertEqual(unterminated.renderPrompt(.object(["text": .string("T")])), "T and {{oops")

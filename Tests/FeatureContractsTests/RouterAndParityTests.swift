@@ -82,6 +82,16 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(events(outcome), [.skippedUnavailable, .outputRejected])
     }
 
+    /// Answers are validated against the *app's* revision (they arrive
+    /// already upgraded), not the revision the server happened to serve.
+    func testRemoteAnswerIsValidatedAgainstTheAppRevisionNotTheServedOne() async {
+        let upgraded = RemoteAnswer(value: Expense.answer(confidence: 80), servedVersion: ContractVersion(1, 1))
+        let outcome = await router(onDevice: Expense.model("d", availability: .unavailable(reason: "x")),
+                                   remote: CountingRemote(counter: CallCounter(), result: .success(upgraded)))
+            .route(Expense.request(), requestID: "served-1.1")
+        XCTAssertEqual(outcome.result, .answered(Expense.answer(confidence: 80), tier: .server(ContractVersion(1, 1))))
+    }
+
     func testOnDeviceOnlyContractNeverLeavesTheDevice() async {
         let counter = CallCounter()
         let outcome = await router(onDevice: Expense.model("device", Expense.answer(category: "groceries")),
@@ -135,6 +145,18 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(cancelled.result, .failed(.cancelled))
         let calls = await counter.count
         XCTAssertEqual(calls, 0)
+
+        // Cancelled before routing: not even the on-device model runs.
+        let deviceCounter = CallCounter()
+        let eager = router(onDevice: CountingModel(counter: deviceCounter, value: Expense.answer()), remote: nil)
+        let early = Task { () -> RouteOutcome in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await eager.route(Expense.request(), requestID: "12")
+        }
+        let earlyOutcome = await early.value
+        XCTAssertEqual(earlyOutcome.result, .failed(.cancelled))
+        let deviceCalls = await deviceCounter.count
+        XCTAssertEqual(deviceCalls, 0)
     }
 
     func testRealClientBehindTheRouterReportsRenegotiation() async {
