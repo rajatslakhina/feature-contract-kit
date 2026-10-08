@@ -60,7 +60,7 @@ final class RouterTests: XCTestCase {
     /// including the trace's description of it.
     func testDeeplyNestedOnDeviceOutputIsRejectedWithoutWalkingIt() async {
         var deep = ContractValue.int(0)
-        for _ in 0..<5_000 { deep = .array([deep]) }
+        for _ in 0..<300 { deep = .array([deep]) } // far past maximumDepth (32), shallow enough that releasing it cannot overflow a 512 KB cooperative-thread stack
         let outcome = await router(onDevice: Expense.model("device", .object(["merchant": deep])), remote: nil)
             .route(Expense.request(), requestID: "deep")
         XCTAssertEqual(outcome.result, .failed(.noTierAvailable))

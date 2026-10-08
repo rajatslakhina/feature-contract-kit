@@ -163,7 +163,7 @@ final class ValidatorTests: XCTestCase {
 
     func testDescriptionOfHostileNestingIsBounded() {
         var deep = ContractValue.int(0)
-        for _ in 0..<5_000 { deep = .array([deep]) }
+        for _ in 0..<300 { deep = .array([deep]) } // far past maximumDepth (32), shallow enough that releasing it cannot overflow a 512 KB cooperative-thread stack
         let text = deep.description
         XCTAssertTrue(text.contains("…"))
         XCTAssertLessThan(text.count, 200)
