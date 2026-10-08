@@ -152,6 +152,16 @@ final class ValidatorTests: XCTestCase {
         XCTAssertEqual(typo.renderPrompt(.object(["text": .string("T")])), "{{txet}} T")
     }
 
+    func testUserTextContainingPlaceholdersIsNotReSubstituted() {
+        let rendered = Expense.v12.renderPrompt(.object(["text": .string("note: {{locale}} {{hint}} }}{{"),
+                                                         "locale": .string("de_DE")]))
+        XCTAssertTrue(rendered.hasSuffix("\nnote: {{locale}} {{hint}} }}{{"), rendered)
+        XCTAssertTrue(rendered.contains("(locale de_DE, hint )"), rendered)
+        var unterminated = Expense.v12
+        unterminated.promptTemplate = "{{text}} and {{oops"
+        XCTAssertEqual(unterminated.renderPrompt(.object(["text": .string("T")])), "T and {{oops")
+    }
+
     func testSameVersionTranslationFillsDefaultsLikeTheSkewPath() throws {
         let v12 = ContractVersion(1, 2)
         let native = try SkewTranslator.translate(Expense.request(), side: .request, in: Expense.contract, from: v12, to: v12)

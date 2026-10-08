@@ -63,6 +63,20 @@ final class FleetTests: XCTestCase {
         XCTAssertEqual(matrix.cell(app: 2, server: 1), .native(ContractVersion(1, 2)))
     }
 
+    /// A removed optional field is lossy on upgrade (the value is dropped)
+    /// but can never make a downgrade fail, so it must not mark a pair degraded.
+    func testRemovedOptionalFieldDoesNotDegradeAPair() {
+        var trimmed = Expense.v11
+        trimmed.version = ContractVersion(1, 2)
+        trimmed.response.fields.removeAll { $0.name == "currency" }
+        let contract = FeatureContract(id: "x", residency: .serverAllowed, revisions: [Expense.v11, trimmed])
+        XCTAssertTrue(ContractLinter.lint(contract).findings.contains { $0.rule == "removed-field" })
+        let matrix = CompatibilityMatrix(contract: contract,
+                                         apps: [AppBuild(name: "a", shipped: ContractVersion(1, 1), installBasisPoints: 100)],
+                                         servers: [ServerBuild(name: "s", shipped: ContractVersion(1, 2))])
+        XCTAssertEqual(matrix.cell(app: 0, server: 0), .serverAhead(agreed: ContractVersion(1, 1), server: ContractVersion(1, 2)))
+    }
+
     func testUnsafeCellNamesTheBreakingFinding() {
         var bad = Expense.v11
         bad.response.fields.removeAll { $0.name == "merchant" }

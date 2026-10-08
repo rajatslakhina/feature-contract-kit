@@ -84,6 +84,14 @@ final class LinterTests: XCTestCase {
         XCTAssertTrue(rules(ContractLinter.compare(old, new)).isEmpty)
     }
 
+    func testChangedDefaultIsReported() {
+        let old = revision(0, response: [Field("n", .integer(0...9), required: false, default: .int(1))])
+        let new = revision(1, response: [Field("n", .integer(0...9), required: false, default: .int(2))])
+        let findings = ContractLinter.compare(old, new)
+        XCTAssertTrue(findings.contains { $0.rule == "default-changed" && $0.severity == .note })
+        XCTAssertTrue(rules(findings).isEmpty)
+    }
+
     func testFallbackCycleIsBreakingNotAHang() {
         let old = revision(0, response: [Field("c", .enumeration(cases: ["x"]))])
         let new = revision(1, response: [Field("c", .enumeration(cases: ["x", "p", "q"], fallbacks: ["p": "q", "q": "p"]))])

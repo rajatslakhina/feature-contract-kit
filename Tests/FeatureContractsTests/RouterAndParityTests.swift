@@ -68,6 +68,20 @@ final class RouterTests: XCTestCase {
         XCTAssertEqual(outcome.trace.first?.detail, "(nesting too deep to show)")
     }
 
+    /// The router validates what any remote conformer returns; it does not
+    /// trust that the conformer happened to validate.
+    func testInvalidRemoteAnswerIsNeverReturned() async {
+        let bogus = RemoteAnswer(value: Expense.answer(category: "groceries"), servedVersion: ContractVersion(1, 2),
+                                 promptFingerprint: nil, renegotiated: false)
+        let outcome = await router(onDevice: Expense.model("d", availability: .unavailable(reason: "x")),
+                                   remote: CountingRemote(counter: CallCounter(), result: .success(bogus)))
+            .route(Expense.request(), requestID: "bogus")
+        guard case .failed(.serverFailed(let detail)) = outcome.result else { return XCTFail("\(outcome.result)") }
+        XCTAssertTrue(detail.contains("groceries"), detail)
+        XCTAssertNil(outcome.answer)
+        XCTAssertEqual(events(outcome), [.skippedUnavailable, .outputRejected])
+    }
+
     func testOnDeviceOnlyContractNeverLeavesTheDevice() async {
         let counter = CallCounter()
         let outcome = await router(onDevice: Expense.model("device", Expense.answer(category: "groceries")),

@@ -2,6 +2,24 @@
 import XCTest
 
 final class WireTests: XCTestCase {
+    /// Independent model of what an app at `app` must receive when the
+    /// server generated `answer` at `server`: written from the contract's
+    /// documented semantics, not by calling `SkewTranslator`.
+    static func expected(_ answer: ContractValue, server: ContractVersion, app: ContractVersion) -> ContractValue {
+        guard var fields = answer.objectValue else { return answer }
+        let served = min(server, app)
+        // Down to the served revision: fields it lacks are dropped; categories follow the chain.
+        if served.minor < 2 { fields["confidence"] = nil }
+        if served.minor < 1 { fields["currency"] = nil }
+        if case .string(var category)? = fields["category"] {
+            if served.minor < 2, category == "hostel" { category = "lodging" }
+            if served.minor < 1, category == "lodging" { category = "travel" }
+            fields["category"] = .string(category)
+        }
+        // Back up to the app's revision: the added response fields are optional with no default.
+        return .object(fields)
+    }
+
     private func client(app: ContractVersion, server: ContractVersion, retiredBelow: ContractVersion? = nil,
                         model: any StructuredModel) -> ContractClient {
         let endpoint = ContractEndpoint(contracts: [Expense.contract.asShipped(upTo: server)],
@@ -198,8 +216,8 @@ final class WireTests: XCTestCase {
                     let model = ScriptedModel(name: "gen") { _, _ in fixed }
                     let result = try await client(app: app, server: server, model: model).answer(Expense.request(), requestID: "p")
                     XCTAssertEqual(result.servedVersion, min(app, server))
-                    // `merchant` is unchanged in every revision, so it must arrive byte for byte.
-                    XCTAssertEqual(result.value.objectValue?["merchant"], fixed.objectValue?["merchant"])
+                    XCTAssertEqual(result.value, Self.expected(fixed, server: server, app: app),
+                                   "server \(server) → app \(app)")
                 }
             }
         }
