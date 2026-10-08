@@ -170,7 +170,12 @@ public struct CompatibilityMatrix: Hashable, Sendable {
         case .serverAhead: downgradedSide = .response
         default: downgradedSide = nil
         }
-        let lossy = all.filter { $0.severity == .lossy && $0.side != nil && $0.side == downgradedSide }
+        // Only widenings make a downgrade fail; a removed field is lossy on
+        // *upgrade* (the value is dropped) and never fails a call.
+        let wideningRules: Set<String> = ["widened-range", "widened-max-length", "widened-max-count"]
+        let lossy = all.filter {
+            $0.severity == .lossy && wideningRules.contains($0.rule) && $0.side != nil && $0.side == downgradedSide
+        }
         return lossy.isEmpty ? base : .degraded(base, lossy: lossy)
     }
 }

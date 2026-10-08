@@ -126,6 +126,10 @@ public enum ContractLinter {
                 if oldField.isRequired && !newField.isRequired && oldField.defaultValue == nil {
                     add(.breaking, fieldPath, "required-became-optional", "old readers require it; give the old field a default")
                 }
+                if oldField.defaultValue != newField.defaultValue {
+                    add(.note, fieldPath, "default-changed",
+                        "\(oldField.defaultValue?.description ?? "none") → \(newField.defaultValue?.description ?? "none"); readers on each side fill different values")
+                }
                 compareTypes(oldField.type, newField.type, path: fieldPath)
             }
             for newField in new.fields where old.field(named: newField.name) == nil {

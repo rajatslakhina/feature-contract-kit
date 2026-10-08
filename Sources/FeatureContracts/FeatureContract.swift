@@ -45,19 +45,35 @@ public struct ContractRevision: Hashable, Sendable {
     /// or across skew. Placeholders that name no request field are left
     /// verbatim, so a template typo shows up in the parity eval instead of
     /// vanishing.
+    ///
+    /// Single pass over the template: a substituted value is never scanned
+    /// again, so user text that happens to contain `{{locale}}` reaches the
+    /// model verbatim instead of being rewritten.
     public func renderPrompt(_ request: ContractValue) -> String {
         let fields = request.objectValue ?? [:]
-        var output = promptTemplate
-        for field in self.request.fields {
-            let value = fields[field.name].flatMap { $0 == .null ? nil : $0 } ?? field.defaultValue
-            let text: String
-            switch value {
-            case .string(let raw)?: text = raw
-            case let other?: text = other.description
-            case nil: text = ""
+        var output = ""
+        var rest = promptTemplate[...]
+        while let open = rest.range(of: "{{") {
+            output += rest[..<open.lowerBound]
+            let afterOpen = rest[open.upperBound...]
+            guard let close = afterOpen.range(of: "}}") else {
+                rest = rest[open.lowerBound...]
+                break
             }
-            output = output.replacingOccurrences(of: "{{\(field.name)}}", with: text)
+            let name = String(afterOpen[..<close.lowerBound])
+            if let field = self.request.field(named: name) {
+                let value = fields[name].flatMap { $0 == .null ? nil : $0 } ?? field.defaultValue
+                switch value {
+                case .string(let raw)?: output += raw
+                case let other?: output += other.description
+                case nil: break
+                }
+            } else {
+                output += "{{\(name)}}"
+            }
+            rest = afterOpen[close.upperBound...]
         }
+        output += rest
         return output
     }
 }

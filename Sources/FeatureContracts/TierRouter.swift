@@ -144,6 +144,14 @@ public struct TierRouter: Sendable {
         }
         do {
             let answer = try await remote.answer(request, requestID: requestID)
+            // `RemoteContractAnswering` is a public, substitutable port, so the
+            // router does not rely on the conformer having validated.
+            let remoteIssues = Validator.validate(answer.value, against: revision.response)
+            guard remoteIssues.isEmpty else {
+                let detail = "answer fails \(revision.version): " + remoteIssues.map(\.description).joined(separator: "; ")
+                log("server", .outputRejected, detail)
+                return RouteOutcome(result: .failed(.serverFailed(detail)), trace: trace, estimatedTokens: tokens)
+            }
             if answer.renegotiated {
                 log("server", .renegotiated, "app \(revision.version) resent at \(answer.servedVersion)")
             }
