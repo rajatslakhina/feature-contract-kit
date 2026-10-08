@@ -5,7 +5,7 @@
 [![CI](https://github.com/rajatslakhina/feature-contract-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/rajatslakhina/feature-contract-kit/actions/workflows/ci.yml)
 ![Swift 6](https://img.shields.io/badge/Swift-6.0-orange) ![Platforms](https://img.shields.io/badge/platforms-iOS%2017%20%7C%20macOS%2014%20%7C%20Linux-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-Demo app: (added after the companion repo is pushed — see below)
+**Demo app:** [feature-contract-kit-demo-app](https://github.com/rajatslakhina/feature-contract-kit-demo-app), a separate Xcode project that consumes this package as a remote dependency. It requires version `1.0.1` up to the next major version. No `Package.resolved` is committed, so a fresh clone resolves the newest 1.x. The demo repo has real CI-Simulator screenshots of all four console tabs.
 
 ---
 
@@ -104,7 +104,7 @@ Zero golden cases, or every field marked `.ignore`, is never reported as a pass.
 ## Usage
 
 ```swift
-.package(url: "https://github.com/rajatslakhina/feature-contract-kit.git", from: "1.0.0")
+.package(url: "https://github.com/rajatslakhina/feature-contract-kit.git", from: "1.0.1")
 ```
 
 ```swift
@@ -129,9 +129,40 @@ let outcome = await router.route(.object(["text": .string(ocrText)]), requestID:
 
 ## Verification
 
-- **Local (author, Linux, Swift 6.1.2):** clean `swift build --build-tests -Xswiftc -warnings-as-errors` (0 warnings) and `swift test`: **55 tests, 0 failures**. The SwiftUI module compiles to nothing on Linux (`#if canImport(SwiftUI)`), so it is only checked by the macOS CI job.
-- **Mutation check:** 30 hand-made source mutations (removing a lint rule, clamping instead of throwing, skipping validation of on-device output, ignoring residency, treating an empty parity eval as a pass, picking the lowest shared version, dropping the body-size guard, and so on). The suite kills all 30. Four of them first survived (one only came to light in the independent review); each was fixed with a new or stronger test, or by deleting a redundant guard.
-- **CI:** results pending the first run.
+- **Local (author, Linux, Swift 6.1.2):** clean `swift build --build-tests -Xswiftc -warnings-as-errors` (0 warnings) and `swift test`: **61 tests, 0 failures**. The SwiftUI module compiles to nothing on Linux (`#if canImport(SwiftUI)`), so it is only checked by the macOS CI job.
+- **Mutation check:** 38 hand-made source mutations (removing a lint rule, clamping instead of throwing, skipping validation of on-device output, ignoring residency, treating an empty parity eval as a pass, picking the lowest shared version, dropping the body-size guard, and so on). The suite kills all 38, and all 38 were re-run against the final code. Four of them first survived (one only came to light in the independent review); each was fixed with a new or stronger test, or by deleting a redundant guard.
+- **CI** ([Actions](https://github.com/rajatslakhina/feature-contract-kit/actions)): two jobs on every push to `main`.
+  - **Linux** (`swift:6.0` container): clean `swift build --build-tests -Xswiftc -warnings-as-errors`, then `swift test`.
+  - **`macos-15`**: the same build including the SwiftUI module, `swift test`, then `xcodebuild` for `generic/platform=iOS Simulator` with warnings as errors.
+  - Every run after the first has passed both jobs. The run for the `v1.0.1` tree reports **61 tests, 0 failures** on macOS as well.
+  - The very first run failed: on macOS, `swift test` died with `signal 10`. A test built a 5,000-deep hostile value inside an async test, and releasing it overflowed a 512 KB cooperative-thread stack. The test now uses 300 levels, still far past the 32-level guard. That failed run is left in the history.
+- **Simulator:** this package has no app target. The demo app was built, installed, launched and screenshotted on a CI iOS Simulator. It was **not** run on the author's Mac. See the demo repo for exactly what ran where.
+- **Independent review:** an Opus reviewer graded the code before the push and returned eight failures. All eight were fixed before `v1.0.0`:
+  - an unbounded `description` recursion on hostile model output;
+  - defaults not applied on the same-version path, which made the prompt depend on skew;
+  - a matrix that hid lossy pairs;
+  - scheme arguments copied from another project;
+  - three tests that could pass against broken code;
+  - a client that masked the server's error;
+  - two unsourced claims;
+  - polish items.
+- **Second independent review** (a fresh Opus reviewer, on `v1.0.0`): eight more findings. Seven were fixed in **`v1.0.1`**:
+  - `TierRouter` now validates answers from *any* `RemoteContractAnswering` conformer, instead of trusting that `ContractClient` did;
+  - `renderPrompt` is a single pass, so user text containing `{{locale}}` reaches the model verbatim;
+  - `degraded` counts only widenings, because a removed field never makes a call fail;
+  - the linter now notes a changed default;
+  - the all-pairs skew test compares each full answer against an independently written expectation;
+  - the demo's screenshot script requires a numeric PID before it says "alive";
+  - the demo README's screenshot and version-pin claims were corrected.
+  - The eighth finding, a mutation reported as never run, was already resolved: it had been re-run and killed against the current code.
+- **Third and final independent review** (fresh Opus): eight findings. All eight were fixed in `v1.0.1`:
+  - `RemoteAnswer` had no public initializer, so the "substitutable" remote port could not be implemented outside the module. A non-`@testable` test now implements it.
+  - A test for validating against the app's revision rather than the served one.
+  - Innermost-placeholder handling in `renderPrompt` (`{{{text}}}`, `{{a {{text}}`).
+  - A cancellation check at the router's entry.
+  - The demo screenshots split one scenario per shot, so each fits on screen.
+  - Stale counts and wording.
+  - **These round-3 fixes were not independently re-reviewed:** the task caps review at three rounds. They are covered by the tests and mutations above.
 
 ## License
 
