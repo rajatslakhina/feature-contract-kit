@@ -90,6 +90,10 @@ public struct TierRouter: Sendable {
             trace.append(TraceStep(id: trace.count, tier: tier, event: event, detail: detail))
         }
 
+        if Task.isCancelled {
+            log("router", .cancelled, "before routing")
+            return RouteOutcome(result: .failed(.cancelled), trace: trace, estimatedTokens: 0)
+        }
         guard let revision = contract.latest else {
             log("router", .requestRejected, "contract has no revisions")
             return RouteOutcome(result: .failed(.invalidRequest), trace: trace, estimatedTokens: 0)

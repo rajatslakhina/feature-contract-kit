@@ -60,7 +60,20 @@ public struct ContractRevision: Hashable, Sendable {
                 rest = rest[open.lowerBound...]
                 break
             }
-            let name = String(afterOpen[..<close.lowerBound])
+            // The placeholder is the *innermost* `{{…}}`: in `{{{text}}}` or
+            // `{{a {{text}}` the name is `text`, and what precedes its last
+            // `{{` is literal text.
+            var inner = afterOpen[..<close.lowerBound]
+            if let lastOpen = inner.range(of: "{{", options: .backwards) {
+                output += "{{" + inner[..<lastOpen.lowerBound]
+                inner = inner[lastOpen.upperBound...]
+            }
+            // Extra opening braces (`{{{text}}}`) are literal too.
+            while inner.hasPrefix("{") {
+                output += "{"
+                inner = inner.dropFirst()
+            }
+            let name = String(inner)
             if let field = self.request.field(named: name) {
                 let value = fields[name].flatMap { $0 == .null ? nil : $0 } ?? field.defaultValue
                 switch value {

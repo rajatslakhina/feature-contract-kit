@@ -8,6 +8,13 @@ public struct RemoteAnswer: Hashable, Sendable {
     public var promptFingerprint: String?
     /// True when the request had to be resent at an older revision.
     public var renegotiated: Bool
+
+    public init(value: ContractValue, servedVersion: ContractVersion, promptFingerprint: String? = nil, renegotiated: Bool = false) {
+        self.value = value
+        self.servedVersion = servedVersion
+        self.promptFingerprint = promptFingerprint
+        self.renegotiated = renegotiated
+    }
 }
 
 public enum ContractClientError: Error, Hashable, Sendable, CustomStringConvertible {
